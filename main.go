@@ -20,6 +20,10 @@ type Sizer interface {
 	Size() int64
 }
 
+func healthzHandler(w http.ResponseWriter, r *http.Request) {
+	return
+}
+
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	bucket := os.Getenv("BUCKET")
 	if bucket == "" {
@@ -115,6 +119,7 @@ func main() {
 		handler = "upload/"
 	}
 
+	http.HandleFunc("/healthz", healthzHandler)
 	http.HandleFunc(handler, uploadHandler)
 	http.ListenAndServe(listen, Log(http.DefaultServeMux))
 }
