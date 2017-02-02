@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -21,15 +20,23 @@ type Sizer interface {
 	Size() int64
 }
 
-var (
-	bucket  = flag.String("bucket", "", "Bucket to upload files to (required)")
-	region  = flag.String("region", "us-east-1", "Bucket region")
-	path    = flag.String("path", "upload/", "S3 prefix path to upload file to")
-	handler = flag.String("handler", "/upload", "Handler URI to trigger upload")
-	listen  = flag.String("listen", ":8080", "host:port combination to listen on")
-)
-
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	bucket := os.Getenv("BUCKET")
+	if bucket == "" {
+		log.Printf("Missing BUCKET environment variable")
+		os.Exit(1)
+	}
+
+	region := os.Getenv("REGION")
+	if region == "" {
+		region = "us-east-1"
+	}
+
+	s3_path := os.Getenv("S3_PATH")
+	if s3_path == "" {
+		s3_path = "upload/"
+	}
+
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "No file in request", 400)
@@ -40,7 +47,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	epoch := now.Unix()
 
-	outfile := fmt.Sprintf("%s%d__%s", *path, epoch, header.Filename)
+	outfile := fmt.Sprintf("%s%d__%s", s3_path, epoch, header.Filename)
 
 	fileHeader := make([]byte, 512)
 
@@ -61,11 +68,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := aws.NewConfig().WithRegion(*region)
+	cfg := aws.NewConfig().WithRegion(region)
 	svc := s3.New(sess, cfg)
 
 	params := &s3.PutObjectInput{
-		Bucket:        aws.String(*bucket),
+		Bucket:        aws.String(bucket),
 		Key:           aws.String(outfile),
 		Body:          file,
 		ContentLength: aws.Int64(fileSize),
@@ -92,13 +99,22 @@ func Log(handler http.Handler) http.Handler {
 }
 
 func main() {
-	flag.Parse()
-
-	if *bucket == "" {
-		flag.PrintDefaults()
+	bucket := os.Getenv("BUCKET")
+	if bucket == "" {
+		log.Printf("Missing BUCKET environment variable")
 		os.Exit(1)
 	}
 
-	http.HandleFunc(*handler, uploadHandler)
-	http.ListenAndServe(*listen, Log(http.DefaultServeMux))
+	listen := os.Getenv("LISTEN")
+	if listen == "" {
+		listen = ":8080"
+	}
+
+	handler := os.Getenv("HANDLER")
+	if handler == "" {
+		handler = "upload/"
+	}
+
+	http.HandleFunc(handler, uploadHandler)
+	http.ListenAndServe(listen, Log(http.DefaultServeMux))
 }
