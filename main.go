@@ -116,7 +116,7 @@ func main() {
 
 	handler := os.Getenv("HANDLER")
 	if handler == "" {
-		handler = "upload/"
+		handler = "/upload"
 	}
 
 	http.HandleFunc("/healthz", healthzHandler)
